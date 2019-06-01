@@ -1,0 +1,328 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Game Physics - CA2 Breno Costa</title>
+<style>
+
+	canvas{
+			display:block;
+			border:1px solid #666;
+			height:400px;
+			width:500px;
+	}
+
+</style>
+<script src="js/Ball.js"> </script>
+<script>
+	var pause = true;
+	var Finitial = {x: 0, y:0};
+	var time = 0; //s
+	var width = 500;
+	var height = 400;
+	var canvas = ctx = false;
+	var ball = new Ball(width/2,30,0,0,0.1,15,-0.7,0,0);
+	var frameRate = 1/40; // Seconds
+	var frameDelay = frameRate * 1000; // ms
+	var loopTimer = false;
+	var Cd = 0.47;  // Dimensionless
+	var rho = 1.22; // kg / m^3
+	var A = Math.PI * ball.getRadius() * ball.getRadius() / (10000); // m^2
+	var ag = 9.81;  // m / s^2
+	var wind = {x: 0, y:0};
+	
+	function resetValues(){
+		ball.setPositionX(width/2);
+		ball.setPositionY(30);
+		ball.setVelocityX(0);
+		ball.setVelocityY(0);
+		ball.setMass(0.1);
+		ball.setRadius(15);
+		ball.setRestitution(-0.7);
+		ball.setAccelerationX(0);
+		ball.setAccelerationY(0);
+		Cd = 0.47;
+		rh0 = 1.22;
+		ag = 9.81;
+		wind.x = 0;
+		wind.y = 0;
+		A = Math.PI * ball.getRadius() * ball.getRadius() / (10000);
+		time = 0;
+		Finitial.x = 0;
+		Finitial.y = 0;
+		updateInputs();		
+	}
+	
+	//change the state of animation
+	function pausePlay(){
+		if(pause){
+			pause = false;
+			unblockInputs();
+		}
+		else{
+			pause = true;
+			blockInputs();
+		}
+	}
+	
+	function drawBall(){
+		ctx.clearRect(0,0,width,height);
+		ctx.save();		
+		ctx.translate(ball.getPosition().x, ball.getPosition().y);
+		ctx.beginPath();
+		ctx.arc(0, 0, ball.getRadius(), 0, Math.PI*2, true);
+		ctx.fill();
+		ctx.closePath();
+		ctx.restore();
+	}
+	
+	function unblockInputs(){
+		document.getElementById("ballPositionX").readOnly = false;	
+		document.getElementById("ballPositionY").readOnly = false;
+		document.getElementById("ballVelocityX").readOnly = false;
+		document.getElementById("ballVelocityY").readOnly = false;
+		document.getElementById("ballAccelerationX").readOnly = false;
+		document.getElementById("ballAccelerationY").readOnly = false;
+		document.getElementById("mass").readOnly = false;
+		document.getElementById("radius").readOnly = false;
+		document.getElementById("restitution").readOnly = false;
+		document.getElementById("windX").readOnly = false;
+		document.getElementById("windY").readOnly = false;
+		document.getElementById("fluidDensity").readOnly = false;
+		document.getElementById("frontalArea").readOnly = false;
+		document.getElementById("gravityAcceleration").readOnly = false;
+		document.getElementById("time").readOnly = false;
+		document.getElementById("initialForceX").readOnly = false;
+		document.getElementById("initialForceY").readOnly = false;
+	}
+	
+	function blockInputs(){
+		document.getElementById("ballPositionX").readOnly;	
+		document.getElementById("ballPositionY").readOnly;
+		document.getElementById("ballVelocityX").readOnly;
+		document.getElementById("ballVelocityY").readOnly;
+		document.getElementById("ballAccelerationX").readOnly;
+		document.getElementById("ballAccelerationY").readOnly;
+		document.getElementById("mass").readOnly;
+		document.getElementById("radius").readOnly;
+		document.getElementById("restitution").readOnly;
+		document.getElementById("windX").readOnly;
+		document.getElementById("windY").readOnly;
+		document.getElementById("fluidDensity").readOnly;
+		document.getElementById("frontalArea").readOnly;
+		document.getElementById("gravityAcceleration").readOnly;
+		document.getElementById("time").readOnly;
+		document.getElementById("initialForceX").readOnly;
+		document.getElementById("initialForceY").readOnly;
+	}
+	
+	function updateInputs(){
+		document.getElementById("ballPositionX").value 			= ball.getPosition().x;
+		document.getElementById("ballPositionY").value 			= ball.getPosition().y; 
+		document.getElementById("ballVelocityX").value 			= ball.getVelocity().x;
+		document.getElementById("ballVelocityY").value 			= ball.getVelocity().y;
+		document.getElementById("ballAccelerationX").value 		= ball.getAcceleration().x;
+		document.getElementById("ballAccelerationY").value 		= ball.getAcceleration().y;
+		document.getElementById("mass").value 					= ball.getMass();
+		document.getElementById("radius").value 				= ball.getRadius();
+		document.getElementById("restitution").value 			= ball.getRestitution();
+		document.getElementById("windX").value 					= wind.x;
+		document.getElementById("windY").value 					= wind.y;
+		document.getElementById("fluidDensity").value 			= rho;
+		document.getElementById("frontalArea").value 			= A;	
+		document.getElementById("gravityAcceleration").value 	= ag;	
+		document.getElementById("time").value 					= time;	
+		document.getElementById("initialForceX").value			= Finitial.x;
+		document.getElementById("initialForceY").value			= Finitial.y;
+	}
+	
+	function updateVariable(input){	
+		clearInterval(loopTimer);
+		
+		if(input.id == "initialForceX")
+			Finitial.x = input.value;
+			
+		if(input.id == "initialForceY")
+			Finitial.y = input.value;
+		
+		if(input.id == "ballPositionX")
+			ball.setPositionX(input.value);
+
+		if(input.id == "ballPositionY")
+			ball.setPositionY(input.value);
+			
+		if(input.id == "ballVelocityX")
+			ball.setVelocityX(input.value);
+			
+		if(input.id == "ballVelocityY")
+			ball.setVelocityY(input.value);
+			
+		if(input.id == "ballAccelerationX")
+			ball.setAccelerationX(input.value);
+			
+		if(input.id == "ballAccelerationY")
+			ball.setAccelerationY(input.value);
+			
+		if(input.id == "radius"){
+			ball.setRadius(input.value);
+			A = Math.PI * ball.getRadius() * ball.getRadius() / (10000);
+			updateInputs();
+		}
+			
+		if(input.id == "mass")
+			ball.setMass(input.value);
+			
+		if(input.id == "restituition")
+			ball.setRestitution(input.value);
+			
+		if(input.id == "fluidDensity")
+			rho = input.value;
+			
+		if(input.id == "frontalArea")
+			A = input.value;
+			
+		if(input.id == "gravityAcceleration")
+			ag = input.value;
+		
+		if(input.id == "time")
+			time = input.value;
+			
+		if(input.id == "windX")
+			wind.x = input.value;
+			
+		if(input.id == "windY")
+			wind.y = input.value;
+			
+		loopTimer = setInterval(loop, frameDelay);
+		
+		//drawBall();
+		//alert("new "+input.id+" value = "+ball.getVelocity().x);
+	}
+	
+	var setup = function() {
+		canvas = document.getElementById("canvas");
+		ctx = canvas.getContext("2d");
+		
+		ctx.fillStyle = 'red';
+		ctx.strokeStyle = '#000000';
+		loopTimer = setInterval(loop, frameDelay);
+	}
+	
+	var loop = function() {
+		if (!pause){
+			// Drag force: Fd = -1/2 * Cd * A * rho * v * v
+			var Fx = -0.5 * Cd * A * rho * ball.getVelocity().x * ball.getVelocity().x * ball.getVelocity().x / Math.abs(ball.getVelocity().x);
+			var Fy = -0.5 * Cd * A * rho * ball.getVelocity().y * ball.getVelocity().y * ball.getVelocity().y / Math.abs(ball.getVelocity().y);
+			
+			Fx = (isNaN(Fx) ? 0 : Fx);
+			Fy = (isNaN(Fy) ? 0 : Fy);
+			
+			//alert(Finitial.x+" "+Finitial.y);
+			
+			Fx = Finitial.x + Fx + wind.x;
+			Fy = Finitial.y + Fy + wind.y;
+			
+			// Calculate acceleration ( F = ma )
+			ball.setAccelerationX(Fx / ball.getMass());
+			ball.setAccelerationY(ag + (Fy / ball.getMass()));
+			
+			// Integrate to get velocity
+			ball.setVelocityX(ball.getVelocity().x + (ball.getAcceleration().x*frameRate));
+			ball.setVelocityY(ball.getVelocity().y + (ball.getAcceleration().y*frameRate));
+			
+			// Integrate to get position
+			ball.setPositionX(ball.getPosition().x + (ball.getVelocity().x*frameRate*100));
+			ball.setPositionY(ball.getPosition().y + (ball.getVelocity().y*frameRate*100));
+			
+			// Handle collisions
+			if (ball.getPosition().y > height - ball.getRadius()) {
+				ball.setVelocityY(ball.getVelocity().y * ball.getRestitution());
+				ball.setPositionY(height - ball.getRadius());
+			}
+				
+			time += 1/40;
+			
+			updateInputs();
+		}
+		
+		// Draw the ball
+		drawBall();		
+	}
+
+</script>
+</head>
+
+<body>
+	<div id="divCanvas" style="float:left">
+		<canvas id="canvas" height="400" width="500">Your browser don't support this aplication</canvas>
+	</div>
+    
+    <div id="divData">        
+        <div id="divBall" style="border:1px solid #000; width:300px; float: left;">
+            <b>Ball</b> 
+            <blockquote>
+                <b>Position</b>
+                <br />
+                X <input type="text" id="ballPositionX" onchange="updateVariable(this)" size="3" /> cm
+                Y <input type="text" id="ballPositionY" onchange="updateVariable(this)" size="3" /> cm
+            </blockquote>
+            <blockquote>
+                <b>Velocity</b> <br />
+                X <input type="text" id="ballVelocityX" onchange="updateVariable(this)" size="3" /> m/s
+                Y <input type="text" id="ballVelocityY" onchange="updateVariable(this)" size="3" /> m/s
+            </blockquote>
+            <blockquote>
+                <b>Acceleration</b> <br />
+                X <input type="text" id="ballAccelerationX" onchange="updateVariable(this)" size="3" /> m/s
+                Y <input type="text" id="ballAccelerationY" onchange="updateVariable(this)" size="3" /> m/s
+            </blockquote>
+            <blockquote>
+            	<b>Mass</b> <input type="text" id="mass" onchange="updateVariable(this)" size="3" /> kg
+            </blockquote>
+            <blockquote>
+            	<b>Radius</b> <input type="text" id="radius" onchange="updateVariable(this)" size="3" /> cm
+            </blockquote>
+            <blockquote>
+            	<b>Frontal Area</b> <input type="text" id="frontalArea" onchange="updateVariable(this)" size="3" /> m^2
+            </blockquote>
+            <blockquote>
+            	<b>Restitution</b> <input type="text" id="restitution" onchange="updateVariable(this)" size="3" />
+            </blockquote>
+        </div>
+        
+        <div id="divGravAcc" style="border:1px solid #000; float: left;">
+        	<b>Gravity Acceleration</b> <input type="text" id="gravityAcceleration" onchange="updateVariable(this)" size="3" /> m/s^2
+        </div>
+        
+        <div id="divFluirdDensity" style="border:1px solid #000; float: left;">
+        	<b>Fluid Density</b> <input type="text" id="fluidDensity" onchange="updateVariable(this)" size="3" /> kg / m^3
+        </div>
+        
+        <div id="divWind" style="border:1px solid #000; float: left;">
+            <b>Wind</b>
+            <br />
+            X <input type="text" id="windX" onchange="updateVariable(this)" size="3" />
+            Y <input type="text" id="windY" onchange="updateVariable(this)" size="3" />
+        </div>
+        
+        <div id="divTime" style="border:1px solid #000;  float: left;">
+            <b>Time </b>
+            <br />
+            <input type="text" id="time" onchange="updateVariable(this)" size="3" /> s
+        </div>
+        
+        <div id="divInitialForce" style="border:1px solid #000;  float: left;">
+        	<b>Initial Force</b> <br />
+            X <input type="text" id="initialForceX" onchange="updateVariable(this)" size="3" /> 
+            Y <input type="text" id="initialForceY" onchange="updateVariable(this)" size="3" /> 
+        </div>
+	</div>
+    <div id="divButtons" style="float:right">
+        <input type="button" name="pausePlay" id="pausePlay" value="Pause/Play" onclick="pausePlay()" />
+        <br />
+        <input type="button" name="reset" id="reset" value="Reset Values" onclick="resetValues()" />
+	</div>
+    
+    <script>updateInputs(); setup(); </script>
+</body>
+</html>
